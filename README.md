@@ -5,6 +5,10 @@
 
 *[English](#english) · [中文](#中文)*
 
+## In action · 使用效果
+
+![ProportionalResize demo: a window keeps its relative size and position when dragged across two displays that use different scaled resolutions](assets/demo.gif)
+
 ---
 
 ## English
