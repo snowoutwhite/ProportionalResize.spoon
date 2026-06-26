@@ -38,8 +38,8 @@ big display ends up filling ~70% of the small one, in the same relative position
 
 Because it only resizes **ordinary windows** — **no full screen, no Spaces** —
 it suits the workflow of users who rely on **Stage Manager** and spread work
-across several monitors. The reprojection is debounced: it fires only *after* a
-window is dropped, never mid-drag.
+across several monitors. It runs only on **mouse-up** — the instant a window is
+dropped — and does nothing during the drag, so dragging stays smooth.
 
 ### Quick install
 
@@ -70,8 +70,7 @@ Edit the block the installer added to `~/.hammerspoon/init.lua`, then reload:
 ```lua
 -- >>> ProportionalResize >>>
 hs.loadSpoon("ProportionalResize")
-spoon.ProportionalResize.animationDuration = 0.12          -- glide time, 0 = instant
-spoon.ProportionalResize.settleDelay       = 0.22          -- wait after drop before acting
+spoon.ProportionalResize.animationDuration = 0.0           -- resize animation, 0 = instant
 spoon.ProportionalResize.excludedApps      = { "iTerm2" }  -- apps to leave alone
 spoon.ProportionalResize:start()
 -- <<< ProportionalResize <<<
@@ -79,8 +78,7 @@ spoon.ProportionalResize:start()
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `animationDuration` | `0.12` | Reposition animation length in seconds. `0` is instant. |
-| `settleDelay` | `0.22` | Wait after movement stops before acting (avoids mid-drag yank). |
+| `animationDuration` | `0` | Resize animation length in seconds. `0` is instant; `0.1` glides. |
 | `excludedApps` | `{}` | App names to ignore. |
 
 <details>
@@ -102,10 +100,11 @@ spoon.ProportionalResize:start()
 
 ### How it works
 
-Each window's frame is tracked as a fraction of its current screen's usable area
-(`{x, y, w, h}` in 0–1). When a `windowMoved` event settles on a *different*
-screen than last seen, the stored fractions are multiplied by the new screen's
-frame and applied as the window's new frame (clamped to stay on-screen).
+On mouse-down it records the grabbed window's frame as a fraction of its screen's
+usable area (`{x, y, w, h}` in 0–1). On mouse-up, if the window ended on a
+*different* screen, those fractions are multiplied by the new screen's frame and
+applied as the window's new frame (clamped to stay on-screen). Nothing runs
+during the drag itself, which keeps dragging smooth.
 
 ### License
 
@@ -138,8 +137,8 @@ frame and applied as the window's new frame (clamped to stay on-screen).
 **相同比例**——在大屏占约 70% 的窗口，落到小屏后仍占约 70%，相对位置保持一致。
 
 由于它只调整**普通窗口**（**不进全屏、不新建 Spaces**），因此契合**依赖台前调度
-(Stage Manager)、在多块屏幕间协作**的用户的工作流。重新投影带防抖：仅在窗口被
-放下后才触发，绝不会在拖动途中拽走窗口。
+(Stage Manager)、在多块屏幕间协作**的用户的工作流。它只在**松开鼠标**（窗口被
+放下）的瞬间触发，拖动过程中不做任何处理，因此拖动始终顺滑。
 
 ### 快速安装
 
@@ -168,8 +167,7 @@ curl -fsSL https://raw.githubusercontent.com/snowoutwhite/ProportionalResize.spo
 ```lua
 -- >>> ProportionalResize >>>
 hs.loadSpoon("ProportionalResize")
-spoon.ProportionalResize.animationDuration = 0.12          -- 投影动画时长，0 = 瞬间
-spoon.ProportionalResize.settleDelay       = 0.22          -- 放下后等待多久再动作
+spoon.ProportionalResize.animationDuration = 0.0           -- 缩放动画时长，0 = 瞬间
 spoon.ProportionalResize.excludedApps      = { "iTerm2" }  -- 要忽略的 App
 spoon.ProportionalResize:start()
 -- <<< ProportionalResize <<<
@@ -177,8 +175,7 @@ spoon.ProportionalResize:start()
 
 | 配置项 | 默认值 | 含义 |
 | --- | --- | --- |
-| `animationDuration` | `0.12` | 投影动画时长（秒），`0` 为瞬间。 |
-| `settleDelay` | `0.22` | 移动停止后等待多久再动作（避免拖到一半被拽走）。 |
+| `animationDuration` | `0` | 缩放动画时长（秒），`0` 为瞬间，`0.1` 会有滑动。 |
 | `excludedApps` | `{}` | 要忽略的 App 名称列表。 |
 
 <details>
@@ -200,9 +197,9 @@ spoon.ProportionalResize:start()
 
 ### 工作原理
 
-对每个窗口，记录它相对当前屏可用区域的 frame 分数（`{x, y, w, h}`，0–1）。当
-`windowMoved` 事件在**与上次不同的屏**上稳定下来时，把存下的分数乘以新屏的 frame
-作为新 frame 应用（并做边界钳制，保证不出屏）。
+按下鼠标时，记录所抓窗口相对当前屏可用区域的 frame 分数（`{x, y, w, h}`，0–1）。
+松开鼠标时，若窗口落在了**另一块屏**上，就把这些分数乘以新屏的 frame 作为新 frame
+应用（并做边界钳制，保证不出屏）。拖动过程中不做任何处理，因此拖动始终顺滑。
 
 ### 许可证
 

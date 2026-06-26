@@ -7,11 +7,15 @@
 --- screens. A window that fit a large/low-density display then overflows a smaller
 --- one (or looks tiny going the other way).
 ---
---- This Spoon watches window moves and, when a window crosses to a different
---- screen, reprojects it so it keeps the same *fraction* of the destination
---- screen it had on the source screen. A window filling ~70% of the big display
---- ends up filling ~70% of the small one. It does not use full screen / Spaces,
---- so it stays compatible with Stage Manager.
+--- This Spoon reprojects a window the moment you drop it on a *different* screen,
+--- so it keeps the same *fraction* of the destination screen it had on the source
+--- screen. A window filling ~70% of the big display ends up filling ~70% of the
+--- small one. It does not use full screen / Spaces, so it stays compatible with
+--- Stage Manager.
+---
+--- v1.1 triggers on mouse-up (hs.eventtap) instead of watching windowMoved: it
+--- does *zero* work while you drag (smooth) and reprojects instantly on release
+--- (no delay).
 ---
 --- Download: https://github.com/snowoutwhite/ProportionalResize.spoon
 
@@ -20,22 +24,16 @@ obj.__index = obj
 
 -- Metadata
 obj.name = "ProportionalResize"
-obj.version = "1.0.0"
+obj.version = "1.1.0"
 obj.author = "snowoutwhite <snowoutwhite2005@gmail.com>"
 obj.homepage = "https://github.com/snowoutwhite/ProportionalResize.spoon"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
 
 --- ProportionalResize.animationDuration
 --- Variable
---- Seconds the reposition animation takes. 0 = instant (most responsive),
---- larger = smoother glide. Default 0.12.
-obj.animationDuration = 0.12
-
---- ProportionalResize.settleDelay
---- Variable
---- Seconds to wait after a window stops moving before reprojecting it. This avoids
---- yanking the window mid-drag. Default 0.22.
-obj.settleDelay = 0.22
+--- Seconds the resize animation takes. 0 = instant (snappiest); a small value
+--- like 0.1 gives a smooth glide. Default 0.
+obj.animationDuration = 0.0
 
 --- ProportionalResize.excludedApps
 --- Variable
@@ -44,11 +42,8 @@ obj.settleDelay = 0.22
 obj.excludedApps = {}
 
 -- ---- internal state ----------------------------------------------------------
-obj._stableScreen = {}  -- winId -> id of the screen where it last settled
-obj._stableRel    = {}  -- winId -> {x,y,w,h} fractions on that screen
-obj._timers       = {}  -- winId -> debounce timer
-obj._adjusting    = {}  -- winId -> true while we are programmatically moving it
-obj._wf           = nil -- window filter
+obj._tap  = nil  -- the mouse eventtap
+obj._drag = nil  -- info captured at mouse-down: { id, screenId, rel }
 
 -- absolute frame -> fraction of its screen's usable frame
 local function relFrame(f, s)
@@ -65,78 +60,79 @@ function obj:_isExcluded(win)
   return false
 end
 
--- called once a window has stopped moving; reproject if it changed screens
-function obj:_settle(win)
-  if not win then return end
-  local id = win:id();      if not id then return end
-  local scr = win:screen(); if not scr then return end
-  local sid = scr:id()
-  local s = scr:frame()  -- usable area (excludes menu bar / Dock)
-
-  if self._stableScreen[id] and self._stableScreen[id] ~= sid and self._stableRel[id] then
-    -- crossed screens: reproject the relative frame from the old screen
-    local rel = self._stableRel[id]
-    local rw = math.min(rel.w, 1.0)
-    local rh = math.min(rel.h, 1.0)
-    local w = rw * s.w
-    local h = rh * s.h
-    local x = s.x + math.max(0, math.min(rel.x, 1.0 - rw)) * s.w
-    local y = s.y + math.max(0, math.min(rel.y, 1.0 - rh)) * s.h
-    self._adjusting[id] = true
-    win:setFrame({ x = x, y = y, w = w, h = h }, self.animationDuration)
-    hs.timer.doAfter(self.settleDelay + self.animationDuration, function()
-      self._adjusting[id] = nil
-      local sc = win:screen()
-      if sc then
-        self._stableScreen[id] = sc:id()
-        self._stableRel[id] = relFrame(win:frame(), sc:frame())
+-- topmost standard window whose frame contains a point
+local function windowUnderPoint(p)
+  for _, w in ipairs(hs.window.orderedWindows()) do
+    if w:isStandard() then
+      local f = w:frame()
+      if p.x >= f.x and p.x <= f.x + f.w and p.y >= f.y and p.y <= f.y + f.h then
+        return w
       end
-    end)
-  else
-    -- same screen (or first sighting): remember current relative frame
-    self._stableScreen[id] = sid
-    self._stableRel[id] = relFrame(win:frame(), s)
+    end
   end
+  return nil
 end
 
-function obj:_onMoved(win)
-  if not win or not win:isStandard() then return end
-  if self:_isExcluded(win) then return end
-  local id = win:id(); if not id then return end
-  if self._adjusting[id] then return end
-  if self._timers[id] then self._timers[id]:stop() end
-  self._timers[id] = hs.timer.doAfter(self.settleDelay, function() self:_settle(win) end)
+-- mouse-down: cheaply remember the grabbed window, its screen and relative frame
+function obj:_onDown()
+  self._drag = nil
+  local w = windowUnderPoint(hs.mouse.absolutePosition())
+  if not w or self:_isExcluded(w) then return end
+  local scr = w:screen(); if not scr then return end
+  self._drag = { id = w:id(), screenId = scr:id(), rel = relFrame(w:frame(), scr:frame()) }
+end
+
+-- mouse-up: if the window ended on a different screen, reproject it immediately
+function obj:_onUp()
+  local d = self._drag; self._drag = nil
+  if not d then return end
+
+  local w = hs.window.focusedWindow()
+  if not w or w:id() ~= d.id then w = hs.window.get(d.id) end
+  if not w then return end
+
+  local cur = w:screen(); if not cur then return end
+  if cur:id() == d.screenId then return end  -- never crossed screens
+
+  local s  = cur:frame()
+  local rw = math.min(d.rel.w, 1.0)
+  local rh = math.min(d.rel.h, 1.0)
+  local x  = s.x + math.max(0, math.min(d.rel.x, 1.0 - rw)) * s.w
+  local y  = s.y + math.max(0, math.min(d.rel.y, 1.0 - rh)) * s.h
+  w:setFrame({ x = x, y = y, w = rw * s.w, h = rh * s.h }, self.animationDuration)
 end
 
 --- ProportionalResize:start()
 --- Method
---- Start watching window moves and reprojecting on screen change.
+--- Start reprojecting windows on cross-screen drops.
 ---
 --- Returns:
 ---  * The ProportionalResize object
 function obj:start()
-  if self._wf then self:stop() end
-  self._wf = hs.window.filter.new(nil)  -- copy of the default filter
-  local handler = function(win) self:_onMoved(win) end
-  self._wf:subscribe(hs.window.filter.windowMoved,   handler)
-  self._wf:subscribe(hs.window.filter.windowCreated, handler)
-  self._wf:subscribe(hs.window.filter.windowFocused, handler)
+  if self._tap then self:stop() end
+  local types = hs.eventtap.event.types
+  self._tap = hs.eventtap.new({ types.leftMouseDown, types.leftMouseUp }, function(e)
+    local t = e:getType()
+    if t == types.leftMouseDown then
+      self:_onDown()
+    elseif t == types.leftMouseUp then
+      self:_onUp()
+    end
+    return false  -- never swallow the event
+  end)
+  self._tap:start()
   return self
 end
 
 --- ProportionalResize:stop()
 --- Method
---- Stop watching window moves.
+--- Stop reprojecting.
 ---
 --- Returns:
 ---  * The ProportionalResize object
 function obj:stop()
-  if self._wf then
-    self._wf:unsubscribeAll()
-    self._wf = nil
-  end
-  for _, t in pairs(self._timers) do if t then t:stop() end end
-  self._timers = {}
+  if self._tap then self._tap:stop(); self._tap = nil end
+  self._drag = nil
   return self
 end
 
