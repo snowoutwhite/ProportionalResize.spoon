@@ -11,13 +11,11 @@
 
 ### Who is this for?
 
-Mac users who:
+Mac users who meet **both** of these:
 
-- run **two or more displays at different scaled resolutions** — e.g. a large
-  external at "looks like 1920×1080" next to a laptop scaled to keep its text
-  comfortably large; and
-- work **in ordinary windows**, especially **Stage Manager** users, rather than
-  living in full-screen apps.
+1. run **two or more displays at different scaled resolutions**; and
+2. work **in ordinary windows** — especially **Stage Manager** users — rather
+   than living in full-screen apps.
 
 If dragging a window across screens keeps leaving it overflowing the small one
 (or tiny on the big one), this is for you.
@@ -118,11 +116,10 @@ during the drag itself, which keeps dragging smooth.
 
 ### 适用人群
 
-适合这样的 Mac 用户：
+**同时满足以下两个条件**的 Mac 用户：
 
-- 同时使用**两块及以上、且缩放分辨率不同**的显示器——例如一块大外接屏
-  「看起来像 1920×1080」，旁边的笔记本为了字号舒适而采用更大的缩放；
-- 习惯**窗口化操作**，尤其是**台前调度 (Stage Manager)** 用户，而非长期全屏。
+1. 同时使用**两块及以上、且缩放分辨率不同**的显示器；
+2. 习惯**窗口化操作**，尤其是**台前调度 (Stage Manager)** 用户，而非长期全屏。
 
 若跨屏拖动窗口后，它总在小屏上溢出、或在大屏上显得过小——这个工具正是为此而生。
 
