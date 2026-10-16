@@ -1,207 +1,123 @@
-# ProportionalResize.spoon
+# macOS 跨屏窗口等比例缩放
 
-> Keep a window's **relative size and position** when it moves to another display.
-> A [Hammerspoon](https://www.hammerspoon.org/) Spoon for mixed-DPI, multi-monitor Macs.
+[中文](README.md) · [English](README.en.md)
 
-*[English](#english) · [中文](#中文)*
+基于 Hammerspoon 的多显示器窗口工具。在窗口被拖到另一块显示器并松开鼠标后，按目标屏幕的可用区域调整窗口大小和位置，尽量保持原有的占屏比例，减少手动调整。
 
-## In action · 使用效果
+适合同时使用 Mac 内置屏幕与外接显示器、屏幕可用尺寸不同，并习惯窗口化工作的用户。插件及安装目录名称仍为 `ProportionalResize.spoon`。
 
-![ProportionalResize demo: a window keeps its relative size and position when dragged across two displays that use different scaled resolutions](assets/demo.gif)
+## 使用效果
 
----
+![窗口跨屏后按目标屏幕调整大小和位置](assets/demo.gif)
 
-## English
+## 主要功能
 
-### Who is this for?
+| 模块 | 功能 |
+| --- | --- |
+| 跨屏缩放 | 根据窗口在原屏幕上的宽、高占比，计算目标窗口尺寸。 |
+| 位置映射 | 保留相对位置，并对目标位置和尺寸进行边界限制。 |
+| 触发时机 | 按下鼠标时记录窗口信息，松开后检查是否跨屏；拖动过程中不执行缩放。 |
+| 配置 | 支持排除指定应用，以及设置缩放动画时长。 |
+| 安装与卸载 | 提供脚本安装、更新和清理配置，也支持手动安装。 |
 
-Mac users who meet **both** of these:
+典型流程：按住窗口 → 拖到另一块屏幕 → 松开鼠标 → 自动调整窗口大小和位置。
 
-1. run **two or more displays at different scaled resolutions**; and
-2. work **in ordinary windows** — especially **Stage Manager** users — rather
-   than living in full-screen apps.
+“等比例”指窗口宽、高分别占屏幕可用区域的比例。两块屏幕宽高比不同时，窗口自身的宽高比可能变化；应用最小窗口尺寸等限制也可能影响最终效果。本工具不修改应用内部的字体或页面缩放比例。
 
-If dragging a window across screens keeps leaving it overflowing the small one
-(or tiny on the big one), this is for you.
+## 技术栈
 
-### The problem
+| 模块 | 技术 |
+| --- | --- |
+| 窗口逻辑 | Lua、Hammerspoon Spoon |
+| 鼠标与窗口 | `hs.eventtap`、`hs.window`、屏幕可用区域映射 |
+| 安装与卸载 | Bash、Git |
 
-When a window is dragged between displays, macOS keeps its **point size
-constant**. So a window sized for a big, low-density display **overflows** a
-smaller one — and a window from the small display looks tiny on the big one.
-The result is resizing windows by hand on every screen change.
+## 项目结构
 
-### What it does
+```text
+.
+├── init.lua          # 鼠标事件和窗口跨屏映射
+├── install.sh        # 安装或更新，添加加载配置
+├── uninstall.sh      # 删除插件及标记内的配置
+├── assets/demo.gif   # 使用演示
+├── README.md
+└── README.en.md
+```
 
-ProportionalResize watches window moves. When a window crosses to a different
-screen, it reprojects the window so it keeps the **same fraction** of the
-destination screen it had on the source screen — a window filling ~70% of the
-big display ends up filling ~70% of the small one, in the same relative position.
+## 环境要求
 
-Because it only resizes **ordinary windows** — **no full screen, no Spaces** —
-it suits the workflow of users who rely on **Stage Manager** and spread work
-across several monitors. It runs only on **mouse-up** — the instant a window is
-dropped — and does nothing during the drag, so dragging stays smooth.
+- macOS，至少两块显示器。
+- 已安装 [Hammerspoon](https://www.hammerspoon.org/)，并授予辅助功能权限。
+- 脚本安装需要 Git，默认检查 `/Applications/Hammerspoon.app`。
 
-### Quick install
+```sh
+brew install --cask hammerspoon
+```
+
+权限位置：系统设置 → 隐私与安全性 → 辅助功能 → 启用 Hammerspoon。
+
+## 安装
+
+### 脚本安装
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/snowoutwhite/ProportionalResize.spoon/main/install.sh | bash
 ```
 
-One command: it drops the Spoon into `~/.hammerspoon/Spoons`, adds two lines to
-your `init.lua`, and reloads.
+脚本将插件下载到 `~/.hammerspoon/Spoons/ProportionalResize.spoon`，并向 `~/.hammerspoon/init.lua` 添加带标记的加载配置。已有 Git 仓库时执行快进更新，已有配置标记时不重复添加。
 
-**Prerequisites:** [Hammerspoon](https://www.hammerspoon.org/)
-(`brew install --cask hammerspoon`) and, one time, Accessibility permission for
-it (*System Settings → Privacy & Security → Accessibility → enable Hammerspoon*).
+若命令行工具 `hs` 可用，脚本会尝试重载配置；否则从 Hammerspoon 菜单选择 **Reload Config**。
 
-### Uninstall
+### 手动安装
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/snowoutwhite/ProportionalResize.spoon/main/uninstall.sh | bash
+git clone https://github.com/snowoutwhite/ProportionalResize.spoon.git \
+  ~/.hammerspoon/Spoons/ProportionalResize.spoon
 ```
 
-Deletes the Spoon **and** removes the two lines it added — **no trace left**.
-The rest of your Hammerspoon config is untouched.
-
-### Configure (optional)
-
-Edit the block the installer added to `~/.hammerspoon/init.lua`, then reload:
+在 `~/.hammerspoon/init.lua` 中添加以下内容，然后重载：
 
 ```lua
 -- >>> ProportionalResize >>>
 hs.loadSpoon("ProportionalResize")
-spoon.ProportionalResize.animationDuration = 0.0           -- resize animation, 0 = instant
-spoon.ProportionalResize.excludedApps      = { "iTerm2" }  -- apps to leave alone
 spoon.ProportionalResize:start()
 -- <<< ProportionalResize <<<
 ```
 
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `animationDuration` | `0` | Resize animation length in seconds. `0` is instant; `0.1` glides. |
-| `excludedApps` | `{}` | App names to ignore. |
+## 配置
 
-<details>
-<summary>Manual install (no script)</summary>
-
-```sh
-git clone https://github.com/snowoutwhite/ProportionalResize.spoon \
-  ~/.hammerspoon/Spoons/ProportionalResize.spoon
-```
-
-Then add to `~/.hammerspoon/init.lua` and reload:
-
-```lua
-hs.loadSpoon("ProportionalResize")
-spoon.ProportionalResize:start()
-```
-
-</details>
-
-### How it works
-
-On mouse-down it records the grabbed window's frame as a fraction of its screen's
-usable area (`{x, y, w, h}` in 0–1). On mouse-up, if the window ended on a
-*different* screen, those fractions are multiplied by the new screen's frame and
-applied as the window's new frame (clamped to stay on-screen). Nothing runs
-during the drag itself, which keeps dragging smooth.
-
-### License
-
-[MIT](LICENSE) © snowoutwhite
-
----
-
-## 中文
-
-让窗口在拖到另一块显示器时，**保持相对大小和相对位置**的 Hammerspoon 小工具。
-
-### 适用人群
-
-**同时满足以下两个条件**的 Mac 用户：
-
-1. 同时使用**两块及以上、且缩放分辨率不同**的显示器；
-2. 习惯**窗口化操作**，尤其是**台前调度 (Stage Manager)** 用户，而非长期全屏。
-
-若跨屏拖动窗口后，它总在小屏上溢出、或在大屏上显得过小——这个工具正是为此而生。
-
-### 解决什么问题
-
-跨屏拖动窗口时，macOS 会**保持窗口的点尺寸不变**。于是为大屏（低密度）准备的窗口
-拖到小屏就**超出屏幕**，反向拖到大屏又显得很小。结果每次换屏都要手动重新拉窗口。
-
-### 它做什么
-
-本工具监听窗口移动。当窗口换到另一块屏时，把它**重新投影**，使其占据目标屏的
-**相同比例**——在大屏占约 70% 的窗口，落到小屏后仍占约 70%，相对位置保持一致。
-
-由于它只调整**普通窗口**（**不进全屏、不新建 Spaces**），因此契合**依赖台前调度
-(Stage Manager)、在多块屏幕间协作**的用户的工作流。它只在**松开鼠标**（窗口被
-放下）的瞬间触发，拖动过程中不做任何处理，因此拖动始终顺滑。
-
-### 快速安装
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/snowoutwhite/ProportionalResize.spoon/main/install.sh | bash
-```
-
-一条命令搞定：把 Spoon 放进 `~/.hammerspoon/Spoons`，向 `init.lua` 追加两行，并重载。
-
-**前置条件：** [Hammerspoon](https://www.hammerspoon.org/)
-（`brew install --cask hammerspoon`），以及一次性给它授予「辅助功能」权限
-（*系统设置 → 隐私与安全性 → 辅助功能 → 打开 Hammerspoon*）。
-
-### 卸载
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/snowoutwhite/ProportionalResize.spoon/main/uninstall.sh | bash
-```
-
-删除 Spoon，**并**移除它写进 `init.lua` 的那两行——**不留任何痕迹**，其余配置原样不动。
-
-### 配置（可选）
-
-编辑安装脚本写进 `~/.hammerspoon/init.lua` 的那段，然后重载：
+在 `start()` 前设置选项，修改后重载：
 
 ```lua
 -- >>> ProportionalResize >>>
 hs.loadSpoon("ProportionalResize")
-spoon.ProportionalResize.animationDuration = 0.0           -- 缩放动画时长，0 = 瞬间
-spoon.ProportionalResize.excludedApps      = { "iTerm2" }  -- 要忽略的 App
+spoon.ProportionalResize.animationDuration = 0.1
+spoon.ProportionalResize.excludedApps = { "iTerm2", "Terminal" }
 spoon.ProportionalResize:start()
 -- <<< ProportionalResize <<<
 ```
 
 | 配置项 | 默认值 | 含义 |
 | --- | --- | --- |
-| `animationDuration` | `0` | 缩放动画时长（秒），`0` 为瞬间，`0.1` 会有滑动。 |
-| `excludedApps` | `{}` | 要忽略的 App 名称列表。 |
+| `animationDuration` | `0` | 动画时长，单位为秒；`0` 为立即调整。 |
+| `excludedApps` | `{}` | 要排除的应用名称列表。 |
 
-<details>
-<summary>手动安装（不用脚本）</summary>
+## 工作原理
+
+1. 按下鼠标时，查找指针下最上层的标准窗口，记录窗口 ID、屏幕 ID，以及相对屏幕可用区域的位置和尺寸。
+2. 松开鼠标时，检查同一个窗口是否跨屏；屏幕未变化则不调整。
+3. 若已跨屏，将记录的相对位置及宽高占比映射到目标屏幕，限制目标边界后设置窗口区域。
+
+主要面向普通窗口的鼠标跨屏拖动，不主动切换全屏或创建 Spaces，也不会响应仅通过键盘或其他工具完成的窗口移动。
+
+## 卸载
 
 ```sh
-git clone https://github.com/snowoutwhite/ProportionalResize.spoon \
-  ~/.hammerspoon/Spoons/ProportionalResize.spoon
+curl -fsSL https://raw.githubusercontent.com/snowoutwhite/ProportionalResize.spoon/main/uninstall.sh | bash
 ```
 
-然后在 `~/.hammerspoon/init.lua` 里加入并重载：
+删除插件目录及 `init.lua` 中起止标记之间的配置，包括该标记块内的自定义选项。完成后重载 Hammerspoon。
 
-```lua
-hs.loadSpoon("ProportionalResize")
-spoon.ProportionalResize:start()
-```
+## 许可证
 
-</details>
-
-### 工作原理
-
-按下鼠标时，记录所抓窗口相对当前屏可用区域的 frame 分数（`{x, y, w, h}`，0–1）。
-松开鼠标时，若窗口落在了**另一块屏**上，就把这些分数乘以新屏的 frame 作为新 frame
-应用（并做边界钳制，保证不出屏）。拖动过程中不做任何处理，因此拖动始终顺滑。
-
-### 许可证
-
-[MIT](LICENSE) © snowoutwhite
+[MIT](LICENSE)
